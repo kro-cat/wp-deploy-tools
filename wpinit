@@ -1,0 +1,179 @@
+#!/bin/sh
+set -eu
+
+PATH=/usr/bin:/usr/sbin:/bin:/sbin
+HOME="$(pwd)"
+
+usage() {
+	cat<<EOF
+Usage: wpinit [options...] FILE -- [wpcli_options...]
+
+Options:
+  -h                           print this message
+EOF
+}
+
+while getopts "h" OPT "$@"
+do
+	case "${OPT}" in
+		h)
+			usage && exit 0
+			;;
+		?)
+			usage && exit 2
+			;;
+		*)
+			break
+			;;
+	esac
+done
+
+shift $((${OPTIND} - 1))
+if [ "$#" -lt 1 ] || [ "$1" = "--" ]
+then
+	usage
+	exit 2
+fi
+
+CONFIG_INI="$(realpath $1)"
+CONFIG_DIR="$(dirname "${CONFIG_INI}")"
+WP_CLI_ARGS="$(echo "$@" | awk -F' -- ' '{print $2}')"
+
+WP_CLI="${HOME}/wp-cli.phar"
+WP="php8.1 ${WP_CLI} ${WP_CLI_ARGS}"
+
+get_ini_values() {
+	SECTION=$1
+	shift 1
+	cat "${CONFIG_INI}" | grep -Fq "[${SECTION}]" || { >&2 echo "no section named \"${SECTION}\"" && return 1; }
+	cat "${CONFIG_INI}" | sed -nr -e "/^\[${SECTION}]/,/^\[/{/^\[/!p}" | {
+		for PROP in "$@"
+		do
+			sed -nr -e "/^[[:space:]]*${PROP}[[:space:]=]/{s/^[^=]*=[[:space:]]*//;p}" | sed 's/\s\+$/\n/'
+		done
+	}
+}
+
+get_ini_value() {
+	get_ini_values $@ | head -n 1
+}
+
+check_wp() {
+	if [ ! -e "${WP_CLI}" ]
+	then
+		wget -O "${WP_CLI}" https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+	fi
+
+	$WP --info
+}
+
+setup_workdir() {
+	check_wp
+
+	if [ ! -e "${HOME}/public_html" ]
+	then
+		if [ -L "${HOME}/public_html" ]
+		then
+			unlink public_html
+		fi
+		mkdir wordpress
+		ln -s wordpress public_html
+	fi
+	
+	cd public_html
+
+	if [ ! -e "${HOME}/public_html/wp-config-sample.php" ]
+	then
+		$WP core download
+	fi
+}
+
+build_value_args() {
+	SECTION="$1"
+	shift 1
+	for key in "$@"
+	do
+		value="$(get_ini_value "${SECTION}" "${key}")"
+		[ ! -z "${value}" ] && echo -n " --${key}=\"${value}\""
+	done
+	return 0
+}
+
+build_flag_args() {
+	SECTION="$1"
+	shift 1
+	for key in "$@"
+	do
+		case "$(get_ini_value "${SECTION}" "${key}")" in
+			[Tt]rue)
+				echo -n " --${key}"
+				;;
+			*)
+				break
+				;;
+		esac
+	done
+	return 0
+}
+
+config() {
+	# configuration values
+	ARGS="$(build_value_args config dbname dbuser dbpass dbhost dbprefix dbcharset dbcollate locale config-file)"
+
+	# configuration flags
+	ARGS="${ARGS} $(build_flag_args config skip-salts skip-check force insecure)"
+
+	EXTRA_PHP="$(get_ini_value config extra-php)"
+	case "${EXTRA_PHP}" in
+		[Ff]alse|'')
+			sh -c "${WP} config create ${ARGS}"
+			;;
+		*)
+			cat "${CONFIG_DIR}/${EXTRA_PHP}" | sh -c "${WP} config create ${ARGS} --extra-php"
+			;;
+	esac
+}
+
+install() {
+	# installation values
+	ARGS="$(build_value_args install url title admin_user admin_password admin_email locale)"
+
+	# installation flags
+	ARGS="${ARGS} $(build_flag_args install skip-email)"
+
+	sh -c "${WP} core install ${ARGS}"
+
+	# https://github.com/wp-cli/wp-cli/issues/5335
+	# Most likely happens when url is not formatted correctly
+	# URL="$(get_ini_value install url)"
+	DIRNAME="$(basename $(realpath .))"
+	sh -c "${WP} search-replace \"/${DIRNAME}\" \"${URL}\""
+
+	return 0
+}
+
+echo "# Initializing WordPress"
+setup_workdir
+
+if [ ! -e "${HOME}/public_html/wp-config.php" ]
+then
+	echo "# Generating wp-config.php"
+	config
+fi
+
+if ! $WP core is-installed
+then
+	echo "# Installing WordPress to database"
+	install
+fi
+
+HEAD="$(get_ini_value sync head)"
+if [ ! -z "${HEAD}" ]
+then
+	echo "# Synchronizing core files with ${HEAD}"
+fi
+
+echo "# Cleaning up"
+rm -fv "${HOME}/wp-cli.phar"
+rm -fvr "${HOME}/.wp-cli"
+rm -fv "${HOME}/.wget-hsts"
