@@ -145,9 +145,9 @@ install() {
 
 	# https://github.com/wp-cli/wp-cli/issues/5335
 	# Most likely happens when url is not formatted correctly
-	# URL="$(get_ini_value install url)"
+	URL="$(get_ini_value install url)"
 	DIRNAME="$(basename $(realpath .))"
-	sh -c "${WP} search-replace \"/${DIRNAME}\" \"${URL}\""
+	sh -c "${WP} search-replace \"${URL}/${DIRNAME}\" \"${URL}\""
 
 	return 0
 }
