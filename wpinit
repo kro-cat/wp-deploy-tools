@@ -147,7 +147,8 @@ install() {
 	# Most likely happens when url is not formatted correctly
 	URL="$(get_ini_value install url)"
 	DIRNAME="$(basename $(realpath .))"
-	sh -c "${WP} search-replace \"${URL}/${DIRNAME}\" \"${URL}\""
+	echo "${WP} search-replace \"${URL}/${DIRNAME}\" \"${URL}\""
+	sh -c "${WP} search-replace \"${URL}/${DIRNAME}\" \"${URL}\"" | grep 'Made '
 
 	return 0
 }
