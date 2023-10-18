@@ -4,6 +4,8 @@ define( 'WP_DEBUG_DISPLAY', false );
 @ini_set( 'display_errors', 0 );
 @error_reporting( E_ALL );
 
+define('MYSQL_CLIENT_FLAGS', MYSQLI_CLIENT_SSL);
+
 define('FS_METHOD', 'direct');
 
 define('WP_ENVIRONMENT_TYPE', 'development');
