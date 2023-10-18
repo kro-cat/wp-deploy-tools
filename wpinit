@@ -160,6 +160,25 @@ if [ ! -e "${HOME}/public_html/wp-config.php" ]
 then
 	echo "# Generating wp-config.php"
 	config
+	# set up anti-ddos thing.
+	cat "${HOME}/public_html/wp-config.php" - <<EOF > "${HOME}/public_html/wp-config.php"
+/**
+ * Disable pingback.ping xmlrpc method to prevent WordPress from participating in DDoS attacks
+ * More info at: https://docs.bitnami.com/general/apps/wordpress/troubleshooting/xmlrpc-and-pingback/
+ */
+if (!defined('WP_CLI')) {
+        // remove x-pingback HTTP header
+        add_filter("wp_headers", function($headers) {
+                unset($headers["X-Pingback"]);
+                return $headers;
+        });
+        // disable pingbacks
+        add_filter("xmlrpc_methods", function($methods) {
+                unset($methods["pingback.ping"]);
+                return $methods;
+        });
+}
+EOF
 fi
 
 if ! $WP core is-installed
