@@ -40,7 +40,7 @@ CONFIG_DIR="$(dirname "${CONFIG_INI}")"
 WP_CLI_ARGS="$(echo "$@" | awk -F' -- ' '{print $2}')"
 
 WP_CLI="${HOME}/wp-cli.phar"
-WP="php8.1 ${WP_CLI} ${WP_CLI_ARGS}"
+WP="php ${WP_CLI} ${WP_CLI_ARGS}"
 
 get_ini_values() {
 	SECTION=$1
@@ -168,14 +168,14 @@ then
  */
 if (!defined('WP_CLI')) {
         // remove x-pingback HTTP header
-        add_filter("wp_headers", function($headers) {
-                unset($headers["X-Pingback"]);
-                return $headers;
+        add_filter("wp_headers", function(\$headers) {
+                unset(\$headers["X-Pingback"]);
+                return \$headers;
         });
         // disable pingbacks
-        add_filter("xmlrpc_methods", function($methods) {
-                unset($methods["pingback.ping"]);
-                return $methods;
+        add_filter("xmlrpc_methods", function(\$methods) {
+                unset(\$methods["pingback.ping"]);
+                return \$methods;
         });
 }
 EOF
