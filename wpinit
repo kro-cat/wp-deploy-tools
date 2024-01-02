@@ -137,10 +137,6 @@ config() {
 	cat - <<EOF >> "${HOME}/public_html/wp-config.php"
 
 if (!defined('WP_CLI')) {
-        if (getenv('DISABLE_WP_MAIL')) {
-                add_filter('pre_wp_mail', '__return_false');
-        }
-
         /**
          * Disable pingback.ping xmlrpc method to prevent WordPress from participating in DDoS attacks
          * More info at: https://docs.bitnami.com/general/apps/wordpress/troubleshooting/xmlrpc-and-pingback/
